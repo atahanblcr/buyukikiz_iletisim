@@ -104,26 +104,54 @@ export async function handleWizardStep(
   // Görsel adımı
   if (state.step === "photo") {
     const photo = (ctx.message as any)?.photo;
-    if (!photo || photo.length === 0) {
-      await ctx.reply("Lütfen bir fotoğraf gönderin.");
+    const document = (ctx.message as any)?.document;
+    
+    let fileId: string | null = null;
+    let filePath: string | null = null;
+
+    // Fotoğraf kontrolü
+    if (photo && photo.length > 0) {
+      // En büyük boyuttaki görseli al
+      const largestPhoto = photo[photo.length - 1];
+      fileId = largestPhoto.file_id;
+    } 
+    // Doküman kontrolü (görsel dosyası olabilir)
+    else if (document && document.mime_type?.startsWith("image/")) {
+      fileId = document.file_id;
+    } 
+    else {
+      await ctx.reply("Lütfen bir fotoğraf gönderin (fotoğraf veya görsel dosyası).");
       return;
     }
 
-    // En büyük boyuttaki görseli al
-    const largestPhoto = photo[photo.length - 1];
-    const fileId = largestPhoto.file_id;
-
-    // Telegram'dan dosya bilgisini al
-    const file = await ctx.telegram.getFile(fileId);
-    const imageUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${file.file_path}`;
-
-    await ctx.reply("⏳ Görsel Cloudinary'ye yükleniyor...");
-
-    const cloudinaryUrl = await uploadImageToCloudinary(imageUrl);
-    if (!cloudinaryUrl) {
-      await ctx.reply("❌ Görsel yüklenemedi. Lütfen tekrar deneyin.");
+    if (!fileId) {
+      await ctx.reply("❌ Görsel dosyası alınamadı. Lütfen tekrar deneyin.");
       return;
     }
+
+    try {
+      // Telegram'dan dosya bilgisini al
+      const file = await ctx.telegram.getFile(fileId);
+      filePath = file.file_path;
+
+      if (!filePath) {
+        throw new Error("Dosya yolu alınamadı");
+      }
+
+      const botToken = process.env.TELEGRAM_BOT_TOKEN;
+      if (!botToken) {
+        throw new Error("TELEGRAM_BOT_TOKEN bulunamadı");
+      }
+
+      const imageUrl = `https://api.telegram.org/file/bot${botToken}/${filePath}`;
+
+      await ctx.reply("⏳ Görsel Cloudinary'ye yükleniyor...");
+
+      const cloudinaryUrl = await uploadImageToCloudinary(imageUrl);
+      if (!cloudinaryUrl) {
+        await ctx.reply("❌ Görsel yüklenemedi. Lütfen tekrar deneyin.");
+        return;
+      }
 
     state.imageUrl = cloudinaryUrl;
     state.step = "confirm";

@@ -29,6 +29,16 @@ export async function GET() {
   }
 }
 
+// Slug oluşturma yardımcı fonksiyonu
+function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, "") // Özel karakterleri kaldır
+    .replace(/[\s_-]+/g, "-") // Boşlukları ve alt çizgileri tire ile değiştir
+    .replace(/^-+|-+$/g, ""); // Başta ve sonda tire varsa kaldır
+}
+
 // POST: Yeni kategori oluştur (Admin için)
 export async function POST(request: NextRequest) {
   try {
@@ -36,18 +46,21 @@ export async function POST(request: NextRequest) {
     const { name, slug, description } = body;
 
     // Validasyon
-    if (!name || !slug) {
+    if (!name) {
       return NextResponse.json(
-        { error: "İsim ve slug gerekli" },
+        { error: "Kategori adı gerekli" },
         { status: 400 }
       );
     }
 
+    // Slug otomatik oluştur (eğer verilmemişse)
+    const categorySlug = slug || generateSlug(name);
+
     const category = await prisma.category.create({
       data: {
         name,
-        slug,
-        description,
+        slug: categorySlug,
+        description: description || null,
       },
     });
 
@@ -55,7 +68,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     if (error.code === "P2002") {
       return NextResponse.json(
-        { error: "Bu kategori zaten mevcut" },
+        { error: "Bu kategori adı veya slug zaten mevcut" },
         { status: 409 }
       );
     }

@@ -68,3 +68,46 @@
   }
 }
 
+/* ============================================
+   BRUTE FORCE Z-INDEX FIXES
+   ============================================ */
+
+/* Force Cloudinary to be on top of EVERYTHING */
+iframe[src*="cloudinary"],
+.cloudinary-overlay,
+.cloudinary-popup,
+.widget-overlay,
+[data-cloudinary-widget],
+div[data-testid="cloudinary-widget"],
+.cloudinary-widget-overlay {
+  z-index: 99999 !important;
+  position: fixed !important;
+}
+
+/* Force Radix UI Popovers (Combobox) to be above the Dialog */
+[data-radix-popper-content-wrapper],
+[data-radix-popover-content] {
+  z-index: 10000 !important;
+}
+
+/* Ensure Command palette items are visible and clickable */
+.cmdk-input,
+.cmdk-list,
+.cmdk-group-heading,
+.cmdk-item {
+  background-color: white !important;
+  z-index: 10001 !important;
+  position: relative !important;
+}
+
+/* Command palette container */
+[cmdk-root],
+[cmdk-dialog] {
+  z-index: 10001 !important;
+}
+
+/* Popover content wrapper */
+[data-radix-portal] {
+  z-index: 10000 !important;
+}
+

@@ -36,8 +36,24 @@ export function CloudinaryUpload({
     script.async = true;
     document.body.appendChild(script);
 
+    // Brute force z-index fix - Global observer to catch all Cloudinary elements
+    const observer = new MutationObserver(() => {
+      const cloudinaryElements = document.querySelectorAll(
+        'iframe[src*="cloudinary"], .cloudinary-overlay, .cloudinary-popup, .widget-overlay, [data-cloudinary-widget], div[data-testid="cloudinary-widget"], [class*="cloudinary"], [id*="cloudinary"]'
+      );
+      cloudinaryElements.forEach((el) => {
+        (el as HTMLElement).style.zIndex = '99999';
+        (el as HTMLElement).style.position = 'fixed';
+      });
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+
     return () => {
-      // Cleanup sırasında script'i kaldırma (diğer bileşenler kullanıyor olabilir)
+      observer.disconnect();
     };
   }, []);
 
@@ -66,6 +82,30 @@ export function CloudinaryUpload({
         showAdvancedOptions: false,
         cropping: false,
         sources: ["local", "camera"],
+        styles: {
+          palette: {
+            window: "#FFFFFF",
+            windowBorder: "#90A0B3",
+            tabIcon: "#0078FF",
+            menuIcons: "#5A616A",
+            textDark: "#000000",
+            textLight: "#FFFFFF",
+            link: "#0078FF",
+            action: "#FF620C",
+            inactiveTabIcon: "#0E2F5A",
+            error: "#F44235",
+            inProgress: "#0078FF",
+            complete: "#20B832",
+            sourceBg: "#E4EBF1",
+          },
+          fonts: {
+            default: null,
+            "'Poppins', sans-serif": {
+              url: "https://fonts.googleapis.com/css?family=Poppins",
+              active: true,
+            },
+          },
+        },
       },
       (error: any, result: any) => {
         if (!error && result && result.event === "success") {
@@ -79,6 +119,17 @@ export function CloudinaryUpload({
 
     widgetRef.current = widget;
     widget.open();
+    
+    // Brute force z-index fix - CSS handles most of it, but ensure it's applied
+    setTimeout(() => {
+      const cloudinaryElements = document.querySelectorAll(
+        'iframe[src*="cloudinary"], .cloudinary-overlay, .cloudinary-popup, .widget-overlay, [data-cloudinary-widget], div[data-testid="cloudinary-widget"]'
+      );
+      cloudinaryElements.forEach((el) => {
+        (el as HTMLElement).style.zIndex = '99999';
+        (el as HTMLElement).style.position = 'fixed';
+      });
+    }, 100);
   };
 
   const removeImage = (urlToRemove: string) => {

@@ -12,11 +12,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 import { CloudinaryUpload } from "@/components/cloudinary-upload";
 import { createProduct, updateProduct, type CreateProductInput } from "@/app/actions/products";
 import { getCategories } from "@/app/actions/categories";
 import { StockStatus, Condition } from "@prisma/client";
-import { Loader2 } from "lucide-react";
+import { Loader2, X } from "lucide-react";
+import {
+  getAllBrands,
+  getModelsByBrand,
+  PHONE_BRANDS,
+} from "@/lib/phone-data";
 
 interface ProductFormProps {
   productId?: string;
@@ -24,6 +30,23 @@ interface ProductFormProps {
   onSuccess?: () => void;
   onCancel?: () => void;
 }
+
+// Standart renkler
+const STANDARD_COLORS = [
+  "Siyah",
+  "Beyaz",
+  "Mavi",
+  "Gold",
+  "Uzay Grisi",
+  "Gümüş",
+  "Kırmızı",
+  "Mor",
+  "Yeşil",
+  "Pembe",
+];
+
+// Standart depolama seçenekleri
+const STANDARD_STORAGE = ["64GB", "128GB", "256GB", "512GB", "1TB"];
 
 export function ProductForm({
   productId,
@@ -33,6 +56,9 @@ export function ProductForm({
 }: ProductFormProps) {
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedBrand, setSelectedBrand] = useState<string>(initialData?.brand || "");
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  
   const [formData, setFormData] = useState<CreateProductInput & { imageUrls: string[] }>({
     brand: initialData?.brand || "",
     model: initialData?.model || "",
@@ -47,9 +73,6 @@ export function ProductForm({
     categoryId: initialData?.categoryId || "",
   });
 
-  const [colorInput, setColorInput] = useState("");
-  const [storageInput, setStorageInput] = useState("");
-
   useEffect(() => {
     // Kategorileri yükle
     getCategories().then((result) => {
@@ -58,6 +81,20 @@ export function ProductForm({
       }
     });
   }, []);
+
+  // Marka değiştiğinde modelleri güncelle
+  useEffect(() => {
+    if (selectedBrand) {
+      const models = getModelsByBrand(selectedBrand);
+      setAvailableModels(models);
+      // Eğer mevcut model seçili markaya ait değilse, temizle
+      if (formData.model && !models.includes(formData.model)) {
+        setFormData({ ...formData, model: "" });
+      }
+    } else {
+      setAvailableModels([]);
+    }
+  }, [selectedBrand]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,237 +135,213 @@ export function ProductForm({
     }
   };
 
-  const addColor = () => {
-    if (colorInput.trim() && !formData.colors.includes(colorInput.trim())) {
+  const toggleColor = (color: string) => {
+    if (formData.colors.includes(color)) {
       setFormData({
         ...formData,
-        colors: [...formData.colors, colorInput.trim()],
+        colors: formData.colors.filter((c) => c !== color),
       });
-      setColorInput("");
+    } else {
+      setFormData({
+        ...formData,
+        colors: [...formData.colors, color],
+      });
     }
   };
 
-  const removeColor = (color: string) => {
-    setFormData({
-      ...formData,
-      colors: formData.colors.filter((c) => c !== color),
-    });
-  };
-
-  const addStorage = () => {
-    if (storageInput.trim() && !formData.storageOptions.includes(storageInput.trim())) {
+  const toggleStorage = (storage: string) => {
+    if (formData.storageOptions.includes(storage)) {
       setFormData({
         ...formData,
-        storageOptions: [...formData.storageOptions, storageInput.trim()],
+        storageOptions: formData.storageOptions.filter((s) => s !== storage),
       });
-      setStorageInput("");
+    } else {
+      setFormData({
+        ...formData,
+        storageOptions: [...formData.storageOptions, storage],
+      });
     }
   };
 
-  const removeStorage = (storage: string) => {
-    setFormData({
-      ...formData,
-      storageOptions: formData.storageOptions.filter((s) => s !== storage),
-    });
+  const handleBrandChange = (brand: string) => {
+    setSelectedBrand(brand);
+    setFormData({ ...formData, brand, model: "" });
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Temel Bilgiler */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="categoryId">Kategori *</Label>
-          <Select
-            value={formData.categoryId}
-            onValueChange={(value) => setFormData({ ...formData, categoryId: value })}
-            required
-          >
-            <SelectTrigger id="categoryId">
-              <SelectValue placeholder="Kategori seçin" />
-            </SelectTrigger>
-            <SelectContent>
-              {categories.map((cat) => (
-                <SelectItem key={cat.id} value={cat.id}>
-                  {cat.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold">Temel Bilgiler</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="categoryId">Kategori *</Label>
+            <Select
+              value={formData.categoryId}
+              onValueChange={(value) => setFormData({ ...formData, categoryId: value })}
+              required
+            >
+              <SelectTrigger id="categoryId">
+                <SelectValue placeholder="Kategori seçin" />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((cat) => (
+                  <SelectItem key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="brand">Marka *</Label>
-          <Input
-            id="brand"
-            value={formData.brand}
-            onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
-            placeholder="Apple, Samsung, vb."
-            required
-          />
-        </div>
+          <div className="space-y-2">
+            <Label htmlFor="brand">Marka *</Label>
+            <Combobox
+              options={getAllBrands()}
+              value={selectedBrand}
+              onValueChange={handleBrandChange}
+              placeholder="Marka seçin"
+              searchPlaceholder="Marka ara..."
+              emptyMessage="Marka bulunamadı"
+            />
+          </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="model">Model *</Label>
-          <Input
-            id="model"
-            value={formData.model}
-            onChange={(e) => setFormData({ ...formData, model: e.target.value })}
-            placeholder="iPhone 15 Pro, Galaxy S24, vb."
-            required
-          />
-        </div>
+          <div className="space-y-2">
+            <Label htmlFor="model">Model *</Label>
+            <Combobox
+              options={availableModels}
+              value={formData.model}
+              onValueChange={(value) => setFormData({ ...formData, model: value })}
+              placeholder={selectedBrand ? "Model seçin" : "Önce marka seçin"}
+              searchPlaceholder="Model ara..."
+              emptyMessage="Model bulunamadı"
+              disabled={!selectedBrand || availableModels.length === 0}
+            />
+          </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="condition">Durum *</Label>
-          <Select
-            value={formData.condition}
-            onValueChange={(value) =>
-              setFormData({ ...formData, condition: value as Condition })
-            }
-            required
-          >
-            <SelectTrigger id="condition">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="NEW">Yeni</SelectItem>
-              <SelectItem value="USED">Kullanılmış</SelectItem>
-              <SelectItem value="OUTLET">Outlet</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+          <div className="space-y-2">
+            <Label htmlFor="condition">Durum *</Label>
+            <Select
+              value={formData.condition}
+              onValueChange={(value) =>
+                setFormData({ ...formData, condition: value as Condition })
+              }
+              required
+            >
+              <SelectTrigger id="condition">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="NEW">Sıfır</SelectItem>
+                <SelectItem value="USED">2. El</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="price">Fiyat (₺) *</Label>
-          <Input
-            id="price"
-            type="number"
-            step="0.01"
-            min="0"
-            value={formData.price}
-            onChange={(e) =>
-              setFormData({ ...formData, price: Number(e.target.value) })
-            }
-            required
-          />
-        </div>
+          <div className="space-y-2">
+            <Label htmlFor="price">Fiyat (₺) *</Label>
+            <Input
+              id="price"
+              type="number"
+              step="0.01"
+              min="0"
+              value={formData.price}
+              onChange={(e) =>
+                setFormData({ ...formData, price: Number(e.target.value) })
+              }
+              required
+            />
+          </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="discountedPrice">İndirimli Fiyat (₺)</Label>
-          <Input
-            id="discountedPrice"
-            type="number"
-            step="0.01"
-            min="0"
-            value={formData.discountedPrice || ""}
-            onChange={(e) =>
-              setFormData({
-                ...formData,
-                discountedPrice: e.target.value ? Number(e.target.value) : undefined,
-              })
-            }
-          />
-        </div>
+          <div className="space-y-2">
+            <Label htmlFor="discountedPrice">İndirimli Fiyat (₺)</Label>
+            <Input
+              id="discountedPrice"
+              type="number"
+              step="0.01"
+              min="0"
+              value={formData.discountedPrice || ""}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  discountedPrice: e.target.value ? Number(e.target.value) : undefined,
+                })
+              }
+            />
+          </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="stockStatus">Stok Durumu *</Label>
-          <Select
-            value={formData.stockStatus}
-            onValueChange={(value) =>
-              setFormData({ ...formData, stockStatus: value as StockStatus })
-            }
-            required
-          >
-            <SelectTrigger id="stockStatus">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="IN_STOCK">Stokta Var</SelectItem>
-              <SelectItem value="OUT_STOCK">Stokta Yok</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="space-y-2">
+            <Label htmlFor="stockStatus">Stok Durumu *</Label>
+            <Select
+              value={formData.stockStatus}
+              onValueChange={(value) =>
+                setFormData({ ...formData, stockStatus: value as StockStatus })
+              }
+              required
+            >
+              <SelectTrigger id="stockStatus">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="IN_STOCK">Stokta Var</SelectItem>
+                <SelectItem value="OUT_STOCK">Stokta Yok</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
       {/* Renkler */}
-      <div className="space-y-2">
-        <Label>Renkler</Label>
-        <div className="flex gap-2 flex-wrap">
-          <Input
-            value={colorInput}
-            onChange={(e) => setColorInput(e.target.value)}
-            placeholder="Renk ekle (örn: Siyah, Beyaz)"
-            className="flex-1 min-w-[200px]"
-            onKeyPress={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                addColor();
-              }
-            }}
-          />
-          <Button type="button" onClick={addColor} variant="outline">
-            Ekle
-          </Button>
+      <div className="space-y-3">
+        <Label>Renkler *</Label>
+        <div className="flex flex-wrap gap-2">
+          {STANDARD_COLORS.map((color) => (
+            <Button
+              key={color}
+              type="button"
+              variant={formData.colors.includes(color) ? "default" : "outline"}
+              size="sm"
+              onClick={() => toggleColor(color)}
+              className="rounded-full"
+            >
+              {color}
+              {formData.colors.includes(color) && (
+                <X className="ml-1 h-3 w-3" />
+              )}
+            </Button>
+          ))}
         </div>
-        {formData.colors.length > 0 && (
-          <div className="flex flex-wrap gap-2 mt-2">
-            {formData.colors.map((color) => (
-              <span
-                key={color}
-                className="inline-flex items-center gap-1 px-3 py-1 bg-secondary rounded-full text-sm"
-              >
-                {color}
-                <button
-                  type="button"
-                  onClick={() => removeColor(color)}
-                  className="hover:text-destructive"
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-          </div>
+        {formData.colors.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            En az bir renk seçmelisiniz
+          </p>
         )}
       </div>
 
       {/* Depolama Seçenekleri */}
-      <div className="space-y-2">
-        <Label>Depolama Seçenekleri</Label>
-        <div className="flex gap-2 flex-wrap">
-          <Input
-            value={storageInput}
-            onChange={(e) => setStorageInput(e.target.value)}
-            placeholder="Depolama ekle (örn: 128GB, 256GB)"
-            className="flex-1 min-w-[200px]"
-            onKeyPress={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                addStorage();
-              }
-            }}
-          />
-          <Button type="button" onClick={addStorage} variant="outline">
-            Ekle
-          </Button>
+      <div className="space-y-3">
+        <Label>Depolama Seçenekleri *</Label>
+        <div className="flex flex-wrap gap-2">
+          {STANDARD_STORAGE.map((storage) => (
+            <Button
+              key={storage}
+              type="button"
+              variant={formData.storageOptions.includes(storage) ? "default" : "outline"}
+              size="sm"
+              onClick={() => toggleStorage(storage)}
+              className="rounded-full"
+            >
+              {storage}
+              {formData.storageOptions.includes(storage) && (
+                <X className="ml-1 h-3 w-3" />
+              )}
+            </Button>
+          ))}
         </div>
-        {formData.storageOptions.length > 0 && (
-          <div className="flex flex-wrap gap-2 mt-2">
-            {formData.storageOptions.map((storage) => (
-              <span
-                key={storage}
-                className="inline-flex items-center gap-1 px-3 py-1 bg-secondary rounded-full text-sm"
-              >
-                {storage}
-                <button
-                  type="button"
-                  onClick={() => removeStorage(storage)}
-                  className="hover:text-destructive"
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-          </div>
+        {formData.storageOptions.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            En az bir depolama seçeneği seçmelisiniz
+          </p>
         )}
       </div>
 
@@ -355,7 +368,7 @@ export function ProductForm({
       </div>
 
       {/* Butonlar */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-end">
+      <div className="flex flex-col sm:flex-row gap-4 justify-end pt-4 border-t">
         {onCancel && (
           <Button type="button" variant="outline" onClick={onCancel}>
             İptal
@@ -377,4 +390,3 @@ export function ProductForm({
     </form>
   );
 }
-
