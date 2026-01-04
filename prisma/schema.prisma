@@ -1,0 +1,143 @@
+// Prisma Schema - Büyükikiz İletişim Dijital Vitrin
+// PostgreSQL veritabanı şeması (Supabase uyumlu)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Kategoriler Tablosu
+model Category {
+  id          String    @id @default(uuid())
+  name        String    @unique // Telefon, Aksesuar, Şarj Cihazı, vb.
+  slug        String    @unique // URL için slug
+  description String?   // Kategori açıklaması
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // İlişkiler
+  products    Product[]
+
+  @@map("categories")
+}
+
+// Ürünler Tablosu
+model Product {
+  id              String      @id @default(uuid())
+  brand           String      // Marka (Apple, Samsung, vb.)
+  model           String      // Model (iPhone 15 Pro, Galaxy S24, vb.)
+  price           Float       // Fiyat
+  discountedPrice Float?      // İndirimli fiyat (opsiyonel)
+  stockStatus     StockStatus @default(IN_STOCK) // Stok durumu
+  condition       Condition   @default(NEW) // Durum
+  colors          String[]    // Renkler dizisi (JSON array)
+  storageOptions  String[]    // Depolama seçenekleri dizisi (JSON array)
+  imageUrls       String[]    // Cloudinary görsel URL'leri dizisi
+  description     String?     // Ürün açıklaması
+  categoryId      String      // Kategori ID
+  createdByAdminId String?    // Hangi admin ekledi (opsiyonel)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // İlişkiler
+  category        Category    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  createdByAdmin  Admin?      @relation("CreatedByAdmin", fields: [createdByAdminId], references: [id], onDelete: SetNull)
+  analytics       Analytics[]
+
+  @@index([categoryId])
+  @@index([brand])
+  @@index([stockStatus])
+  @@index([createdByAdminId])
+  @@map("products")
+}
+
+// Stok Durumu Enum
+enum StockStatus {
+  IN_STOCK  // Stokta Var
+  OUT_STOCK // Stokta Yok
+}
+
+// Ürün Durumu Enum
+enum Condition {
+  NEW     // Yeni
+  USED    // Kullanılmış
+  OUTLET  // Outlet
+}
+
+// Adminler Tablosu
+model Admin {
+  id         String   @id @default(uuid())
+  email      String   @unique // E-posta adresi
+  password   String   // Hash'lenmiş şifre
+  name       String   // Admin adı
+  telegramId BigInt?  @unique // Telegram kullanıcı ID'si
+  role       String   @default("admin") // Rol (admin, super_admin, vb.)
+  isActive   Boolean  @default(true) // Aktif mi?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // İlişkiler
+  createdProducts Product[]    @relation("CreatedByAdmin")
+  adminLogs       AdminLog[]
+
+  @@map("admins")
+}
+
+// Analitik Tablosu
+model Analytics {
+  id              String        @id @default(uuid())
+  productId       String?       // Ürün ID (opsiyonel - ürün tıklaması için)
+  eventType       AnalyticsType // Olay tipi
+  source          String        // Kaynak: 'web' veya 'telegram'
+  metadata        String?       // Ek bilgiler (JSON formatında)
+  createdAt       DateTime      @default(now())
+
+  // İlişkiler
+  product         Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([productId])
+  @@index([eventType])
+  @@index([source])
+  @@index([createdAt])
+  @@map("analytics")
+}
+
+// Analitik Olay Tipi Enum
+enum AnalyticsType {
+  PRODUCT_CLICK      // Ürün tıklaması
+  WHATSAPP_BUTTON    // WhatsApp satın alma butonu tıklaması
+  PAGE_VIEW          // Sayfa görüntüleme
+  SEARCH             // Arama
+}
+
+// Admin Logları Tablosu (Audit Trail)
+model AdminLog {
+  id        String      @id @default(uuid())
+  adminId   String      // Admin ID
+  adminName String      // Admin adı (hızlı erişim için)
+  actionType AdminActionType // İşlem tipi
+  details   String?     // Detaylar (örn: "Added iPhone 11")
+  createdAt DateTime    @default(now())
+
+  // İlişkiler
+  admin     Admin       @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+  @@index([actionType])
+  @@index([createdAt])
+  @@map("admin_logs")
+}
+
+// Admin İşlem Tipi Enum
+enum AdminActionType {
+  ADD_PRODUCT      // Ürün ekleme
+  DELETE_PRODUCT   // Ürün silme
+  UPDATE_PRODUCT   // Ürün güncelleme
+  UPDATE_PRICE     // Fiyat güncelleme
+  UPDATE_STOCK     // Stok güncelleme
+}
+
